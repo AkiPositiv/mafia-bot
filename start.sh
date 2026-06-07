@@ -1,6 +1,32 @@
 #!/bin/bash
 set -e
 
+echo ">>> DATABASE_URL = ${DATABASE_URL:0:40}..."
+
+# Ждём пока PostgreSQL поднимется (Railway стартует сервисы параллельно)
+echo ">>> Waiting for database..."
+MAX_RETRIES=30
+for i in $(seq 1 $MAX_RETRIES); do
+    python -c "
+import asyncio, asyncpg, os, sys
+url = os.environ.get('DATABASE_URL','')
+# asyncpg не понимает postgresql+asyncpg://, нужен чистый postgresql://
+url = url.replace('postgresql+asyncpg://', 'postgresql://')
+async def check():
+    try:
+        conn = await asyncpg.connect(url, timeout=5)
+        await conn.close()
+    except Exception as e:
+        print(f'DB not ready: {e}', flush=True)
+        sys.exit(1)
+asyncio.run(check())
+" && break
+    echo ">>> Attempt $i/$MAX_RETRIES failed, retrying in 2s..."
+    sleep 2
+done
+
+echo ">>> Database is ready."
+
 echo ">>> Running Alembic migrations..."
 alembic upgrade head
 echo ">>> Migrations done."
