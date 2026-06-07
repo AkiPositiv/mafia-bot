@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mafia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mafia_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-mafia_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mafia} -d ${POSTGRES_DB:-mafia_db}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  game_bot:
+    build: .
+    restart: unless-stopped
+    command: python game_bot.py
+    env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://mafia:mafia_secret@postgres:5432/mafia_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  admin_bot:
+    build: .
+    restart: unless-stopped
+    command: python admin_bot.py
+    env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://mafia:mafia_secret@postgres:5432/mafia_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
