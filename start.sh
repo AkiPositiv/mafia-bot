@@ -10,7 +10,6 @@ for i in $(seq 1 $MAX_RETRIES); do
     python -c "
 import asyncio, asyncpg, os, sys
 url = os.environ.get('DATABASE_URL','')
-# asyncpg не понимает postgresql+asyncpg://, нужен чистый postgresql://
 url = url.replace('postgresql+asyncpg://', 'postgresql://')
 async def check():
     try:
@@ -36,15 +35,22 @@ python game_bot.py &
 GAME_PID=$!
 
 echo ">>> Starting Admin Bot..."
+# Admin Bot падение не должно убивать Game Bot
 python admin_bot.py &
 ADMIN_PID=$!
 
 echo ">>> Both bots running. game_pid=$GAME_PID admin_pid=$ADMIN_PID"
 
-# Ждём завершения любого из процессов
-wait -n $GAME_PID $ADMIN_PID
-EXIT_CODE=$?
+# Следим только за Game Bot — он главный
+# Если admin_bot упадёт, логируем и продолжаем
+monitor_admin() {
+    wait $ADMIN_PID 2>/dev/null
+    echo ">>> Admin Bot exited (will not restart game_bot)"
+}
+monitor_admin &
 
-echo ">>> One of the bots exited (code $EXIT_CODE). Stopping both."
-kill $GAME_PID $ADMIN_PID 2>/dev/null || true
-exit $EXIT_CODE
+# Контейнер живёт пока жив Game Bot
+wait $GAME_PID
+echo ">>> Game Bot exited. Stopping."
+kill $ADMIN_PID 2>/dev/null || true
+exit $?
