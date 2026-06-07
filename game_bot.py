@@ -4,7 +4,7 @@ Main entry point: Game Bot.
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
@@ -23,6 +23,7 @@ from bot.handlers.common.profile import router as profile_router
 from bot.handlers.common.member import router as member_router
 from bot.handlers.game.leaderboard import router as leaderboard_router
 from bot.handlers.game.last_word import router as last_word_router
+from bot.handlers.admin.commands import AdminMiddleware, manage_router as admin_manage_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,6 +91,13 @@ async def main() -> None:
     dp.include_router(shop_router)
     dp.include_router(leaderboard_router)
     dp.include_router(last_word_router)
+
+    # Admin commands available in private chat (/adminhelp to see the list)
+    _admin_gate = Router()
+    _admin_gate.message.filter(F.chat.type == "private")
+    _admin_gate.message.middleware(AdminMiddleware())
+    _admin_gate.include_router(admin_manage_router)
+    dp.include_router(_admin_gate)
 
     logger.info("Game Bot starting...")
     try:

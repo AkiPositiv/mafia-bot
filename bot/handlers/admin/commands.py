@@ -67,7 +67,7 @@ async def cmd_addchat(message: Message, bot: Bot):
     await message.answer(f"✅ Чат <b>{title}</b> (<code>{chat_id}</code>) добавлен в белый список.", parse_mode="HTML")
 
 
-@router.message(Command("delchat"))
+@router.message(Command("delchat", "deletechat"))
 async def cmd_delchat(message: Message):
     """/delchat <chat_id>"""
     args = message.text.split()
@@ -393,4 +393,25 @@ async def cmd_admin_help(message: Message):
         "/broadcast &lt;текст&gt;"
     )
     await message.answer(text, parse_mode="HTML")
+
+
+# ─────────────────── Game-bot integration router ─────────────────
+# A subset router (no /start conflict) added to game_bot with AdminMiddleware
+# so the admin can manage chats/bans directly via the game bot in private chat.
+
+manage_router = Router()
+manage_router.message(Command("addchat"))(cmd_addchat)
+manage_router.message(Command("delchat", "deletechat"))(cmd_delchat)
+manage_router.message(Command("listchats"))(cmd_listchats)
+manage_router.message(Command("give_diamonds"))(cmd_give_diamonds)
+manage_router.message(Command("take_diamonds"))(cmd_take_diamonds)
+manage_router.message(Command("give_coins"))(cmd_give_coins)
+manage_router.message(Command("take_coins"))(cmd_take_coins)
+manage_router.message(Command("ban"))(cmd_ban)
+manage_router.message(Command("unban"))(cmd_unban)
+manage_router.message(Command("info"))(cmd_info)
+manage_router.message(Command("broadcast"))(cmd_broadcast)
+manage_router.message(Command("set_price"))(cmd_set_price)
+manage_router.message(Command("prices"))(cmd_prices)
+manage_router.message(Command("adminhelp"))(cmd_admin_help)
 
