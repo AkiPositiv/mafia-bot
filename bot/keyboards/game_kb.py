@@ -73,6 +73,7 @@ def shop_main_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="📄 Документы — 200 монет", callback_data="shop:docs")
     builder.button(text="🥈 Сер. пуля — 1 💎", callback_data="shop:silver_bullet")
     builder.button(text="🎭 Купить роль — 1-3 💎", callback_data="shop:role_menu")
+    builder.button(text="📖 Роли и описания", callback_data="roles:menu")
     builder.button(text="◀ В профиль", callback_data="profile:main")
     builder.adjust(1)
     return builder.as_markup()

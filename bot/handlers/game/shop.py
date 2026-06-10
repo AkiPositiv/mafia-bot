@@ -14,8 +14,45 @@ from bot.database.crud import (
     get_user, log_transaction, remove_item, update_balance,
 )
 from bot.database.engine import AsyncSessionLocal
-from bot.game.roles import ALL_ROLES, RoleName
+from bot.game.roles import ALL_ROLES, RoleName, Team
 from bot.keyboards.game_kb import shop_main_keyboard, shop_roles_keyboard
+
+_TEAM_LABELS = {
+    Team.TOWN:    ("🏙", "Город"),
+    Team.MAFIA:   ("🔪", "Мафия"),
+    Team.NEUTRAL: ("⚡", "Нейтралы"),
+}
+
+
+def _roles_menu_kb():
+    builder = InlineKeyboardBuilder()
+    for team, (emoji, label) in _TEAM_LABELS.items():
+        count = sum(1 for r in ALL_ROLES.values() if r.team == team)
+        builder.button(text=f"{emoji} {label} ({count} ролей)", callback_data=f"roles:{team.value}")
+    builder.button(text="◀ В магазин", callback_data="shop:main")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def _back_to_roles_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="◀ К командам", callback_data="roles:menu")
+    return builder.as_markup()
+
+
+def _format_team_roles(team: Team) -> str:
+    emoji_h, label_h = _TEAM_LABELS[team]
+    lines = [f"<b>{emoji_h} {label_h}</b>\n"]
+    for role in ALL_ROLES.values():
+        if role.team != team:
+            continue
+        uniq = " <i>(уник.)</i>" if role.is_unique else ""
+        lines.append(
+            f"{role.emoji} <b>{role.label}</b>{uniq}\n"
+            f"📝 {role.description}\n"
+            f"🎯 {role.goal}\n"
+        )
+    return "\n".join(lines)
 
 def _back_to_shop_kb():
     from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -45,9 +82,15 @@ async def _role_shop_items(session) -> list[tuple[str, str, int]]:
 async def _send_main_shop_menu(event: Message | CallbackQuery, user_id: int):
     """Общий хелпер для показа меню магазина."""
     async with AsyncSessionLocal() as session:
-        user = await get_user(session, user_id)
-        coins = user.coins if user else 0
-        diamonds = user.diamonds if user else 0
+        tg_user = event.from_user
+        user, _ = await get_or_create_user(
+            session, user_id,
+            tg_user.username if tg_user else None,
+            tg_user.full_name if tg_user else None,
+        )
+        await session.commit()
+        coins = user.coins
+        diamonds = user.diamonds
 
     text = (
         f"🏪 <b>Магазин</b>\n\n"
@@ -280,3 +323,26 @@ async def cb_buy_stars_stub(callback: CallbackQuery):
     # Заглушка для платежей. В реальном боте здесь выставляется инвойс.
     qty = callback.data.split(":")[2]
     await callback.answer("⏳ Функция оплаты через Telegram Stars будет доступна в ближайшем обновлении!", show_alert=True)
+
+
+@router.callback_query(F.data == "roles:menu")
+async def cb_roles_menu(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.edit_text(
+        "📖 <b>Роли в игре</b>\n\nВыберите команду для просмотра:",
+        reply_markup=_roles_menu_kb(),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("roles:") & ~F.data.in_({"roles:menu"}))
+async def cb_roles_team(callback: CallbackQuery):
+    await callback.answer()
+    team_value = callback.data[len("roles:"):]
+    try:
+        team = Team(team_value)
+    except ValueError:
+        await callback.answer("❌ Неизвестная команда.", show_alert=True)
+        return
+    text = _format_team_roles(team)
+    await callback.message.edit_text(text, reply_markup=_back_to_roles_kb(), parse_mode="HTML")
