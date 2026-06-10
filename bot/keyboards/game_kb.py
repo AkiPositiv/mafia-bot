@@ -140,8 +140,11 @@ def trial_keyboard(game_id: int, likes: int = 0, dislikes: int = 0) -> InlineKey
 
 def back_to_chat_button(chat_id: int, game_id: int) -> InlineKeyboardMarkup:
     """Кнопка 'Перейти в чат' для DM-сообщений."""
+    from bot.game import registry as _reg
+    engine = _reg.get(chat_id)
+    msg_id = (engine.lobby_message_id or 1) if engine else 1
+    inner = str(chat_id).replace('-100', '')
     kb = InlineKeyboardBuilder()
-    chat_link = f"https://t.me/c/{str(chat_id).replace('-100', '')}"
-    kb.button(text="💬 Перейти в чат", url=chat_link)
+    kb.button(text="💬 Перейти в чат", url=f"https://t.me/c/{inner}/{msg_id}")
     return kb.as_markup()
 

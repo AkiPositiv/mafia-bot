@@ -32,12 +32,16 @@ def _chat_kb(chat_id: int):
     return builder.as_markup()
 
 
-def _with_chat_link(kb, chat_id: int):
+def _with_chat_link(kb, chat_id: int, engine=None):
     """Добавляет кнопку 'Перейти в чат' к существующей клавиатуре."""
     from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from bot.game import registry as _reg
+    if engine is None:
+        engine = _reg.get(chat_id)
+    msg_id = (engine.lobby_message_id or 1) if engine else 1
     builder = InlineKeyboardBuilder.from_markup(kb)
-    chat_link = f"https://t.me/c/{str(chat_id).replace('-100', '')}"
-    builder.row(InlineKeyboardButton(text="💬 Перейти в чат", url=chat_link))
+    builder.row(InlineKeyboardButton(text="💬 Перейти в чат",
+                                     url=f"https://t.me/c/{str(chat_id).replace('-100', '')}/{msg_id}"))
     return builder.as_markup()
 
 

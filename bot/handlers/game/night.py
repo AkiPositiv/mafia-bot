@@ -8,7 +8,7 @@ from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, Message
 
 from bot.game.engine import GameEngine
-from bot.game.roles import ALL_ROLES, RoleName, Team
+from bot.game.roles import ALL_ROLES, APPEARS_CIVILIAN, RoleName, Team
 from bot.game import registry
 from bot.keyboards.game_kb import (
     commissioner_action_keyboard, mafia_vote_keyboard,
@@ -26,9 +26,11 @@ def _with_chat_link(kb, chat_id: int, game_id: int):
     """Добавляет кнопку 'Перейти в чат' снизу к любой существующей клавиатуре."""
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.types import InlineKeyboardButton
+    engine = registry.get(chat_id)
+    msg_id = (engine.lobby_message_id or 1) if engine else 1
     builder = InlineKeyboardBuilder.from_markup(kb)
-    chat_link = f"https://t.me/c/{str(chat_id).replace('-100', '')}"
-    builder.row(InlineKeyboardButton(text="💬 Перейти в чат", url=chat_link))
+    builder.row(InlineKeyboardButton(text="💬 Перейти в чат",
+                                     url=f"https://t.me/c/{str(chat_id).replace('-100', '')}/{msg_id}"))
     return builder.as_markup()
 
 
@@ -222,8 +224,14 @@ async def cb_commissioner_check(callback: CallbackQuery):
     name = _get_name(engine, target_id)
     engine.commissioner_results.append(f"🔍 {name}: {result}")
     
-    # Use localized result
-    is_mafia = "❌" in result or "Мафия" in result
+    # Check team directly — string matching breaks for "Дон Мафии", "Ниндзя", etc.
+    target_p = engine.players.get(target_id)
+    is_mafia = (
+        target_p is not None
+        and not target_p.has_docs
+        and target_p.role not in APPEARS_CIVILIAN
+        and target_p.role_obj.team == Team.MAFIA
+    )
     if is_mafia:
         msg_text = t("night_dm_commissioner_result_mafia", lang, name=name)
     else:
